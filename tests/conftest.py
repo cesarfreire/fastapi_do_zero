@@ -10,6 +10,33 @@ from sqlalchemy.pool import StaticPool
 from fastapi_do_zero.app import app
 from fastapi_do_zero.database import get_session
 from fastapi_do_zero.models import User, table_registry
+from fastapi_do_zero.security import get_password_hash
+from fastapi_do_zero.settings import Settings
+
+
+@pytest.fixture
+def settings():
+    """
+    Fixture to provide application settings for testing.
+    This can be used to override settings in tests if needed.
+    """
+    return Settings()
+
+
+@pytest.fixture
+def token(client, user):
+    """
+    Fixture to create a JWT token for the user created in the `user` fixture.
+    This token will be used in tests that require authentication.
+    """
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': user.email,
+            'password': user.clean_password,
+        },
+    )
+    return response.json()['access_token']
 
 
 @pytest.fixture
@@ -18,10 +45,18 @@ def user(session):
     Fixture to create a user in the database for testing purposes.
     This user will be used in tests that require a user to be present.
     """
-    user = User(username='Test', email='test@test.com', password='testtest')
+    password = 'testtest'
+    user = User(
+        username='test',
+        email='test@test.com',
+        password=get_password_hash(password),
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
+
+    user.clean_password = password  # Store the plain password for tests
+
     return user
 
 
