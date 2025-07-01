@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi_do_zero.database import get_session
 from fastapi_do_zero.exceptions.auth import PermissionException
@@ -20,15 +20,15 @@ from fastapi_do_zero.security import get_current_user, get_password_hash
 
 users_router = APIRouter(prefix='/users', tags=['users'])
 
-Session = Annotated[Session, Depends(get_session)]
+Session = Annotated[AsyncSession, Depends(get_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @users_router.post(
     '/', status_code=HTTPStatus.CREATED, response_model=UserPublicSchema
 )
-def create_user(user: UserSchema, session: Session):
-    db_user: User | None = session.scalar(
+async def create_user(user: UserSchema, session: Session):
+    db_user = await session.scalar(
         select(User).where(
             (User.username == user.username) | (User.email == user.email)
         )
@@ -46,8 +46,8 @@ def create_user(user: UserSchema, session: Session):
         email=user.email,
     )
     session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
+    await session.commit()
+    await session.refresh(db_user)
 
     return db_user
 
@@ -55,14 +55,14 @@ def create_user(user: UserSchema, session: Session):
 @users_router.get(
     '/', status_code=HTTPStatus.OK, response_model=UserListSchema
 )
-def list_users(
+async def list_users(
     session: Session,
     current_user: CurrentUser,
     filter_users: Annotated[FilterParams, Query()],
 ):
-    users = session.scalars(
+    users = await session.scalars(
         select(User).offset(filter_users.offset).limit(filter_users.limit)
-    ).all()
+    )
     return {'users': users}
 
 
@@ -71,7 +71,7 @@ def list_users(
     status_code=HTTPStatus.OK,
     response_model=UserPublicSchema,
 )
-def update_user(
+async def update_user(
     user_id: int,
     user: UserSchema,
     session: Session,
@@ -84,8 +84,8 @@ def update_user(
         current_user.username = user.username
         current_user.password = get_password_hash(user.password)
         current_user.email = user.email
-        session.commit()
-        session.refresh(current_user)
+        await session.commit()
+        await session.refresh(current_user)
         return current_user
     except IntegrityError:
         raise HTTPException(
@@ -99,7 +99,7 @@ def update_user(
     status_code=HTTPStatus.OK,
     response_model=Message,
 )
-def delete_user(
+async def delete_user(
     user_id: int,
     session: Session,
     current_user: CurrentUser,
@@ -107,8 +107,8 @@ def delete_user(
     if current_user.id != user_id:
         raise PermissionException
 
-    session.delete(current_user)
-    session.commit()
+    await session.delete(current_user)
+    await session.commit()
 
     return Message(message='User deleted successfully')
 
@@ -118,8 +118,8 @@ def delete_user(
     status_code=HTTPStatus.OK,
     response_model=UserPublicSchema,
 )
-def read_user(user_id: int, session: Session):
-    db_user = session.scalar(select(User).where(User.id == user_id))
+async def read_user(user_id: int, session: Session):
+    db_user = await session.scalar(select(User).where(User.id == user_id))
 
     if not db_user:
         raise HTTPException(
