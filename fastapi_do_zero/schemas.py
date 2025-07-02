@@ -1,4 +1,8 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from fastapi_do_zero.models import TodoState
 
 
 class Message(BaseModel):
@@ -30,3 +34,31 @@ class JWTToken(BaseModel):
 class FilterParams(BaseModel):
     offset: int = Field(ge=0, default=0)
     limit: int = Field(ge=0, default=100)
+
+
+class TodoSchema(BaseModel):
+    title: str
+    description: str
+    state: TodoState
+
+
+class TodoPublicSchema(TodoSchema):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class TodoListSchema(BaseModel):
+    todos: list[TodoPublicSchema]
+
+
+class TodoUpdateSchema(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    state: TodoState | None = None
+
+
+class FilterTodoParams(FilterParams):
+    title: str | None = Field(None, min_length=3, max_length=20)
+    description: str | None = Field(None, min_length=3, max_length=20)
+    state: TodoState | None = None

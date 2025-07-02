@@ -1,18 +1,35 @@
 from contextlib import contextmanager
 from datetime import datetime
 
+import factory
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.pool import StaticPool
+from testcontainers.postgres import PostgresContainer
 
 from fastapi_do_zero.app import app
 from fastapi_do_zero.database import get_session
 from fastapi_do_zero.models import User, table_registry
 from fastapi_do_zero.security import get_password_hash
 from fastapi_do_zero.settings import Settings
+
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    username = factory.Sequence(lambda n: f'test{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.username}@test.com')
+    password = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')
+
+
+@pytest.fixture(scope='session')
+def engine():
+    with PostgresContainer('postgres:16', driver='psycopg') as postgres:
+        _engine = create_async_engine(postgres.get_connection_url())
+        yield _engine
 
 
 @pytest.fixture
@@ -47,16 +64,26 @@ async def user(session: AsyncSession):
     This user will be used in tests that require a user to be present.
     """
     password = 'testtest'
-    user = User(
-        username='test',
-        email='test@test.com',
-        password=get_password_hash(password),
-    )
+    user = UserFactory(password=get_password_hash(password))
     session.add(user)
     await session.commit()
     await session.refresh(user)
 
     user.clean_password = password  # Store the plain password for tests
+
+    return user
+
+
+@pytest_asyncio.fixture
+async def other_user(session):
+    password = 'testtest'
+    user = UserFactory(password=get_password_hash(password))
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    user.clean_password = password
 
     return user
 
@@ -80,13 +107,7 @@ def client(session):
 
 
 @pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine(
-        'sqlite+aiosqlite:///:memory:',
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool,
-    )
-
+async def session(engine):
     async with engine.begin() as conn:
         await conn.run_sync(table_registry.metadata.create_all)
 

@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from logging.config import fileConfig
 
 from alembic import context
@@ -17,6 +18,9 @@ config.set_main_option('sqlalchemy.url', Settings().DATABASE_URL)
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # add your model's MetaData object here
 # for 'autogenerate' support

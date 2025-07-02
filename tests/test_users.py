@@ -100,21 +100,13 @@ def test_update_user_deve_atualizar_usuario_existente(client, user, token):
 
 
 def test_update_user_deve_retornar_409_para_usuario_existente(
-    client, user, token
+    client, user, other_user, token
 ):
-    client.post(
-        '/users',
-        json={
-            'username': 'fausto',
-            'email': 'fausto@example.com',
-            'password': 'secret',
-        },
-    )
     response_update = client.put(
         f'/users/{user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
-            'username': 'fausto',
+            'username': other_user.username,
             'email': 'bob@example.com',
             'password': 'mynewpassword',
         },
@@ -125,14 +117,16 @@ def test_update_user_deve_retornar_409_para_usuario_existente(
     }
 
 
-def test_update_user_deve_retornar_403_para_outro_usuario(client, token):
+def test_update_user_deve_retornar_403_para_outro_usuario(
+    client, other_user, token
+):
     response = client.put(
-        '/users/999',
+        f'/users/{other_user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
-            'username': 'alice_not_updated',
-            'email': 'alice@example.com',
-            'password': 'new_secret',
+            'username': 'bob',
+            'email': 'bob@example.com',
+            'password': 'mynewpassword',
         },
     )
 
@@ -152,9 +146,11 @@ def test_delete_user_deve_deletar_usuario_existente(client, user, token):
     assert response.json() == {'message': 'User deleted successfully'}
 
 
-def test_delete_user_deve_retornar_403_para_outro_usuario(client, user, token):
+def test_delete_user_deve_retornar_403_para_outro_usuario(
+    client, other_user, token
+):
     response = client.delete(
-        f'/users/{user.id + 1}', headers={'Authorization': f'Bearer {token}'}
+        f'/users/{other_user.id}', headers={'Authorization': f'Bearer {token}'}
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN

@@ -1,7 +1,10 @@
 from http import HTTPStatus
 
+import pytest
 
-def test_root_deve_retornar_ok(client):
+
+@pytest.mark.asyncio
+async def test_root_deve_retornar_ok(client):
     response = client.get('/status')
 
     assert response.status_code == HTTPStatus.OK

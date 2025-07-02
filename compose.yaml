@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    env_file:
+      - .env
+
+  app:
+    image: fastapi_do_zero_app
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    env_file:
+      - .env
+    entrypoint: ./entrypoint.sh
+
+volumes:
+  pgdata:

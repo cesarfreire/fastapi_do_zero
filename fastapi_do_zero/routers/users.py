@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,6 +24,8 @@ users_router = APIRouter(prefix='/users', tags=['users'])
 Session = Annotated[AsyncSession, Depends(get_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
+logger = getLogger('uvicorn.error')
+
 
 @users_router.post(
     '/', status_code=HTTPStatus.CREATED, response_model=UserPublicSchema
@@ -35,6 +38,10 @@ async def create_user(user: UserSchema, session: Session):
     )
 
     if db_user:
+        logger.warning(
+            f'User with username {user.username} '
+            f'or email {user.email} already exists.'
+        )
         raise HTTPException(
             status_code=HTTPStatus.CONFLICT,
             detail='Username or email already exists',
@@ -88,6 +95,10 @@ async def update_user(
         await session.refresh(current_user)
         return current_user
     except IntegrityError:
+        logger.warning(
+            f'Update failed for user {user_id} '
+            f'due to duplicate username or email.'
+        )
         raise HTTPException(
             status_code=HTTPStatus.CONFLICT,
             detail='Username or email already exists',
@@ -122,6 +133,7 @@ async def read_user(user_id: int, session: Session):
     db_user = await session.scalar(select(User).where(User.id == user_id))
 
     if not db_user:
+        logger.warning(f'User with id {user_id} not found.')
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='User not found'
         )
